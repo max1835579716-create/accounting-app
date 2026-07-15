@@ -111,15 +111,18 @@ final class AppStoreTests: XCTestCase {
         )
     }
 
-    func testBackgroundGlassRetractsAwayWhileActiveCircleRemains() {
+    func testBackgroundGlassContinuouslyMorphsBetweenCircleAndCapsule() {
         let expanded = TabBarAnimationModel(progress: 0, selectedTab: .bills)
+        let middle = TabBarAnimationModel(progress: 0.5, selectedTab: .bills)
         let collapsed = TabBarAnimationModel(progress: 1, selectedTab: .bills)
 
         XCTAssertEqual(expanded.leadingEdge, collapsed.leadingEdge, accuracy: 0.001)
         XCTAssertEqual(expanded.containerSize(expandedWidth: 336).width, 336, accuracy: 0.001)
         XCTAssertEqual(expanded.containerSize(expandedWidth: 336).height, 68, accuracy: 0.001)
-        XCTAssertEqual(collapsed.containerSize(expandedWidth: 336).width, 0, accuracy: 0.001)
-        XCTAssertEqual(collapsed.containerSize(expandedWidth: 336).height, 0, accuracy: 0.001)
+        XCTAssertEqual(middle.containerSize(expandedWidth: 336).width, 195, accuracy: 0.001)
+        XCTAssertEqual(middle.containerSize(expandedWidth: 336).height, 61, accuracy: 0.001)
+        XCTAssertEqual(collapsed.containerSize(expandedWidth: 336).width, 54, accuracy: 0.001)
+        XCTAssertEqual(collapsed.containerSize(expandedWidth: 336).height, 54, accuracy: 0.001)
     }
 
     func testActiveTabContinuouslyBecomesCenteredGlassCircle() {
@@ -155,14 +158,14 @@ final class AppStoreTests: XCTestCase {
         )
         XCTAssertEqual(
             collapsed.inactiveState(for: .more, expandedWidth: 336).scale,
-            0.92,
+            0.94,
             accuracy: 0.001
         )
     }
 
-    func testInactiveTabsWaitUntilContainerIsHalfExpanded() {
-        let beforeThreshold = TabBarAnimationModel(progress: 0.51, selectedTab: .bills)
-        let afterThreshold = TabBarAnimationModel(progress: 0.35, selectedTab: .bills)
+    func testInactiveTabsWaitUntilContainerBeginsExpanding() {
+        let beforeThreshold = TabBarAnimationModel(progress: 0.76, selectedTab: .bills)
+        let afterThreshold = TabBarAnimationModel(progress: 0.60, selectedTab: .bills)
 
         XCTAssertEqual(
             beforeThreshold.inactiveState(for: .more, expandedWidth: 336).opacity,
@@ -173,6 +176,60 @@ final class AppStoreTests: XCTestCase {
             afterThreshold.inactiveState(for: .more, expandedWidth: 336).opacity,
             0
         )
+    }
+
+    func testInactiveTabsRevealInPlaceWithOnlySubtleVerticalMotion() {
+        let collapsed = TabBarAnimationModel(progress: 1, selectedTab: .bills)
+            .inactiveState(for: .more, expandedWidth: 336)
+        let middle = TabBarAnimationModel(progress: 0.5, selectedTab: .bills)
+            .inactiveState(for: .more, expandedWidth: 336)
+        let expanded = TabBarAnimationModel(progress: 0, selectedTab: .bills)
+            .inactiveState(for: .more, expandedWidth: 336)
+
+        XCTAssertEqual(collapsed.centerX, middle.centerX, accuracy: 0.001)
+        XCTAssertEqual(middle.centerX, expanded.centerX, accuracy: 0.001)
+        XCTAssertEqual(collapsed.offsetY, 1.5, accuracy: 0.001)
+        XCTAssertGreaterThan(middle.opacity, 0)
+        XCTAssertLessThan(middle.opacity, 1)
+        XCTAssertGreaterThan(middle.scale, 0.94)
+        XCTAssertLessThan(middle.scale, 1)
+        XCTAssertEqual(expanded.offsetY, 0, accuracy: 0.001)
+    }
+
+    func testActiveIconMovesContinuouslyFromCollapsedSeedToSelectedSlot() {
+        let collapsed = TabBarAnimationModel(progress: 1, selectedTab: .savings)
+            .activeState(expandedWidth: 336)
+        let middle = TabBarAnimationModel(progress: 0.5, selectedTab: .savings)
+            .activeState(expandedWidth: 336)
+        let expanded = TabBarAnimationModel(progress: 0, selectedTab: .savings)
+            .activeState(expandedWidth: 336)
+
+        XCTAssertEqual(collapsed.centerX, 27, accuracy: 0.001)
+        XCTAssertEqual(
+            middle.centerX,
+            (collapsed.centerX + expanded.centerX) / 2,
+            accuracy: 0.001
+        )
+        XCTAssertGreaterThan(middle.centerX, collapsed.centerX)
+        XCTAssertLessThan(middle.centerX, expanded.centerX)
+    }
+
+    func testTransitionLensKeepsCollapsedSeedAndHandsOffToInteractiveEdges() {
+        let interactive = LiquidLensEdges(minX: 210, maxX: 278)
+        let collapsed = TabBarAnimationModel(progress: 1, selectedTab: .savings)
+            .visualLensEdges(
+                interactiveEdges: interactive,
+                expandedWidth: 336
+            )
+        let expanded = TabBarAnimationModel(progress: 0, selectedTab: .savings)
+            .visualLensEdges(
+                interactiveEdges: interactive,
+                expandedWidth: 336
+            )
+
+        XCTAssertEqual(collapsed.centerX, 27, accuracy: 0.001)
+        XCTAssertEqual(collapsed.width, 54, accuracy: 0.001)
+        XCTAssertEqual(expanded, interactive)
     }
 
     func testActiveGlassAppearanceDoesNotChangeWithCollapseProgress() {

@@ -4,6 +4,7 @@ struct TabBarInactiveVisualState: Equatable {
     let centerX: CGFloat
     let opacity: Double
     let scale: CGFloat
+    let offsetY: CGFloat
     let isInteractive: Bool
 }
 
@@ -551,6 +552,10 @@ struct TabBarAnimationModel {
         min(max(progress, 0), 1)
     }
 
+    var expansionProgress: CGFloat {
+        1 - clampedProgress
+    }
+
     var leadingEdge: CGFloat { 0 }
 
     var collapsedTabIdentifier: String {
@@ -565,12 +570,12 @@ struct TabBarAnimationModel {
         CGSize(
             width: interpolate(
                 expandedWidth,
-                0,
+                Self.collapsedDiameter,
                 by: clampedProgress
             ),
             height: interpolate(
                 Self.expandedHeight,
-                0,
+                Self.collapsedDiameter,
                 by: clampedProgress
             )
         )
@@ -595,19 +600,38 @@ struct TabBarAnimationModel {
         )
     }
 
+    func visualLensEdges(
+        interactiveEdges: LiquidLensEdges,
+        expandedWidth: CGFloat
+    ) -> LiquidLensEdges {
+        let active = activeState(expandedWidth: expandedWidth)
+        let transitionEdges = LiquidLensEdges(
+            minX: active.centerX - active.width / 2,
+            maxX: active.centerX + active.width / 2
+        )
+        let handoff = smoothstep(
+            normalize(expansionProgress, lower: 0.82, upper: 1)
+        )
+
+        return LiquidLensEdges(
+            minX: interpolate(transitionEdges.minX, interactiveEdges.minX, by: handoff),
+            maxX: interpolate(transitionEdges.maxX, interactiveEdges.maxX, by: handoff)
+        )
+    }
+
     func inactiveState(
         for tab: AppTab,
         expandedWidth: CGFloat
     ) -> TabBarInactiveVisualState {
-        let expandedFraction = 1 - clampedProgress
         let reveal = smoothstep(
-            normalize(expandedFraction, lower: 0.5, upper: 0.75)
+            normalize(expansionProgress, lower: 0.25, upper: 0.70)
         )
 
         return TabBarInactiveVisualState(
             centerX: centerX(for: tab, expandedWidth: expandedWidth),
             opacity: Double(reveal),
-            scale: interpolate(0.92, 1, by: reveal),
+            scale: interpolate(0.94, 1, by: reveal),
+            offsetY: interpolate(1.5, 0, by: reveal),
             isInteractive: reveal > 0.98
         )
     }
@@ -681,9 +705,9 @@ struct FloatingTabBar: View {
     private let dragThreshold: CGFloat = 5
     private let dragCoordinateSpace = "LiquidTabBar"
     private let geometrySpring = Animation.spring(
-        response: 0.36,
-        dampingFraction: 0.88,
-        blendDuration: 0.08
+        response: 0.42,
+        dampingFraction: 0.90,
+        blendDuration: 0.10
     )
 
     var body: some View {
@@ -722,29 +746,34 @@ struct FloatingTabBar: View {
         )
         let centers = resolvedCenters(model: model, expandedWidth: expandedWidth)
         let baseWidth = model.activeState(expandedWidth: expandedWidth).width
-        let edges = displayedEdges(
+        let interactiveEdges = displayedEdges(
             centers: centers,
             baseWidth: baseWidth
         )
+        let edges = model.visualLensEdges(
+            interactiveEdges: interactiveEdges,
+            expandedWidth: expandedWidth
+        )
 
         return ZStack(alignment: .leading) {
+            expandedNavigationLayers(
+                model: model,
+                expandedWidth: expandedWidth,
+                centers: centers,
+                baseWidth: baseWidth,
+                edges: edges
+            )
+
             if isCollapsed {
-                glassSurface(model: model, expandedWidth: expandedWidth)
-                    .zIndex(0)
-                collapsedInactiveButtons(model: model, expandedWidth: expandedWidth)
-                    .zIndex(1)
-                collapsedActiveLens(model: model, expandedWidth: expandedWidth)
-                    .zIndex(2)
                 collapsedActiveButton(model: model, expandedWidth: expandedWidth)
-                    .zIndex(3)
+                    .zIndex(5)
             } else {
-                expandedNavigationLayers(
-                    model: model,
+                accessibilityInteractionLayer(
                     expandedWidth: expandedWidth,
                     centers: centers,
-                    baseWidth: baseWidth,
-                    edges: edges
+                    baseWidth: baseWidth
                 )
+                .zIndex(5)
             }
         }
         .frame(width: expandedWidth, height: barHeight, alignment: .leading)
@@ -787,6 +816,7 @@ struct FloatingTabBar: View {
             .zIndex(1)
 
             tabContentLayer(
+                model: model,
                 expandedWidth: expandedWidth,
                 centers: centers,
                 edges: edges,
@@ -802,12 +832,6 @@ struct FloatingTabBar: View {
             )
             .zIndex(3)
 
-            accessibilityInteractionLayer(
-                expandedWidth: expandedWidth,
-                centers: centers,
-                baseWidth: baseWidth
-            )
-            .zIndex(4)
         }
     }
 
@@ -940,6 +964,7 @@ struct FloatingTabBar: View {
     }
 
     private func tabContentLayer(
+        model: TabBarAnimationModel,
         expandedWidth: CGFloat,
         centers: [CGFloat],
         edges: LiquidLensEdges,
@@ -957,33 +982,50 @@ struct FloatingTabBar: View {
                 let tabCenterX = centers.indices.contains(index)
                     ? centers[index]
                     : 0
+                let isActive = tab == selection
+                let activeState = model.activeState(expandedWidth: expandedWidth)
+                let inactiveState = model.inactiveState(
+                    for: tab,
+                    expandedWidth: expandedWidth
+                )
+                let visualCenterX = isActive ? activeState.centerX : tabCenterX
                 let visualState = LiquidTabIconVisualModel.state(
-                    tabCenterX: tabCenterX,
+                    tabCenterX: visualCenterX,
                     lensEdges: edges,
                     baseWidth: baseWidth,
                     reduceMotion: reduceMotion
                 )
 
-                AppTabIconView(tab: tab)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .modifier(
-                        LiquidTabIconVisualStyle(
-                            state: visualState,
-                            appearance: appearance
-                        )
-                    )
-                    .background {
-                        GeometryReader { geometry in
-                            Color.clear.preference(
-                                key: LiquidTabCenterPreferenceKey.self,
-                                value: [
-                                    tab: geometry.frame(
-                                        in: .named(dragCoordinateSpace)
-                                    ).midX
-                                ]
+                ZStack {
+                    AppTabIconView(tab: tab)
+                        .modifier(
+                            LiquidTabIconVisualStyle(
+                                state: visualState,
+                                appearance: appearance
                             )
-                        }
+                        )
+                        .scaleEffect(
+                            isActive || reduceMotion ? 1 : inactiveState.scale
+                        )
+                        .offset(
+                            x: isActive ? activeState.centerX - tabCenterX : 0,
+                            y: isActive || reduceMotion ? 0 : inactiveState.offsetY
+                        )
+                        .opacity(isActive ? 1 : inactiveState.opacity)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background {
+                    GeometryReader { geometry in
+                        Color.clear.preference(
+                            key: LiquidTabCenterPreferenceKey.self,
+                            value: [
+                                tab: geometry.frame(
+                                    in: .named(dragCoordinateSpace)
+                                ).midX
+                            ]
+                        )
                     }
+                }
             }
         }
         .frame(width: contentWidth, height: barHeight)
@@ -1030,86 +1072,6 @@ struct FloatingTabBar: View {
         .frame(width: expandedWidth, height: barHeight)
     }
 
-    private func collapsedInactiveButtons(
-        model: TabBarAnimationModel,
-        expandedWidth: CGFloat
-    ) -> some View {
-        ZStack(alignment: .leading) {
-            ForEach(AppTab.allCases.filter { $0 != selection }) { tab in
-                collapsedInactiveButton(
-                    tab,
-                    model: model,
-                    expandedWidth: expandedWidth
-                )
-            }
-        }
-        .frame(width: expandedWidth, height: barHeight, alignment: .leading)
-        .allowsHitTesting(false)
-    }
-
-    private func collapsedInactiveButton(
-        _ tab: AppTab,
-        model: TabBarAnimationModel,
-        expandedWidth: CGFloat
-    ) -> some View {
-        let state = model.inactiveState(for: tab, expandedWidth: expandedWidth)
-
-        return Button { } label: {
-            AppTabIconView(tab: tab)
-                .foregroundStyle(Color.primary.opacity(0.72))
-                .frame(width: 54, height: 54)
-                .contentShape(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                )
-        }
-        .buttonStyle(.plain)
-        .position(x: state.centerX, y: barHeight / 2)
-        .opacity(state.opacity)
-        .scaleEffect(reduceMotion ? 1 : state.scale)
-        .allowsHitTesting(state.isInteractive && !isCollapsed)
-        .disabled(isCollapsed || !state.isInteractive)
-        .accessibilityHidden(isCollapsed || state.opacity < 0.98)
-        .accessibilityLabel(tab.title)
-        .accessibilityValue("")
-        .accessibilityIdentifier("tab-\(tab.rawValue)")
-    }
-
-    private func collapsedActiveLens(
-        model: TabBarAnimationModel,
-        expandedWidth: CGFloat
-    ) -> some View {
-        let state = model.activeState(expandedWidth: expandedWidth)
-        let appearance = model.activeAppearance
-        let shape = RoundedRectangle(
-            cornerRadius: state.cornerRadius,
-            style: .continuous
-        )
-
-        return ZStack {
-            shape
-                .fill(.clear)
-                .modifier(
-                    ActiveTabGlassStyle(
-                        cornerRadius: state.cornerRadius,
-                        appearance: appearance
-                    )
-                )
-                .overlay {
-                    shape
-                        .stroke(.white.opacity(0.28), lineWidth: 0.8)
-                        .blur(radius: 0.2)
-                }
-
-            AppTabIconView(tab: selection)
-                .foregroundStyle(appearance.iconColor)
-                .frame(width: 54, height: 54)
-        }
-        .frame(width: state.width, height: state.height)
-        .position(x: state.centerX, y: barHeight / 2)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-
     private func collapsedActiveButton(
         model: TabBarAnimationModel,
         expandedWidth: CGFloat
@@ -1133,6 +1095,9 @@ struct FloatingTabBar: View {
             expandCollapsedBar()
         }
         .position(x: state.centerX, y: barHeight / 2)
+        .allowsHitTesting(isCollapsed)
+        .disabled(!isCollapsed)
+        .accessibilityHidden(!isCollapsed)
         .accessibilityLabel("展开导航栏，当前页面：\(selection.title)")
         .accessibilityValue("single-active-control")
         .accessibilityIdentifier(model.collapsedTabIdentifier)
@@ -1404,9 +1369,7 @@ struct FloatingTabBar: View {
 
     private func expandCollapsedBar() {
         guard isCollapsed else { return }
-        withAnimation(geometrySpring) {
-            isCollapsed = false
-        }
+        isCollapsed = false
     }
 
     private func animateCollapse(to collapsed: Bool) {

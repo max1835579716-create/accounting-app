@@ -55,7 +55,7 @@ final class TabBarUITests: XCTestCase {
         waitForStableFrame(collapsedBills)
         waitForStableFrame(app.staticTexts["本月工资"].firstMatch)
         XCTAssertFalse(app.buttons["tab-bills"].exists)
-        XCTAssertFalse(app.buttons["tab-savings"].isEnabled)
+        XCTAssertFalse(app.buttons["tab-savings"].exists)
         keepScreenshot(app, named: "Bills retained in collapsed bar")
 
         collapsedBills.tap()
