@@ -1,0 +1,32 @@
+# macOS
+.DS_Store
+
+# Xcode user/local state
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+
+# Xcode build output
+build/
+DerivedData/
+.derivedData/
+
+# Swift Package Manager build output
+.build/
+.swiftpm/
+
+# Local Codex/review scratch files
+.codex_doc_review/
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# Environment files and local secrets
+.env
+.env.*
+
+# Local app/user data
+*.db
+*.sqlite
+*.sqlite3
