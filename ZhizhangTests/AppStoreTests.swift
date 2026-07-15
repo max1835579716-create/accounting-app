@@ -294,4 +294,54 @@ final class AppStoreTests: XCTestCase {
         XCTAssertEqual(motion.edges.centerX, 240, accuracy: 0.35)
         XCTAssertEqual(motion.edges.width, 54, accuracy: 0.35)
     }
+
+    func testLiquidTabIconAtLensCenterUsesFullContinuousInfluence() {
+        let state = LiquidTabIconVisualModel.state(
+            tabCenterX: 120,
+            lensEdges: LiquidLensEdges(minX: 93, maxX: 147),
+            baseWidth: 54,
+            reduceMotion: false
+        )
+
+        XCTAssertEqual(state.influence, 1, accuracy: 0.001)
+        XCTAssertEqual(state.scale, 1.075, accuracy: 0.001)
+        XCTAssertEqual(state.offsetY, -1.25, accuracy: 0.001)
+        XCTAssertEqual(state.brightness, 0.025, accuracy: 0.001)
+    }
+
+    func testLiquidTabIconInfluenceFallsOffSmoothlyWithoutLeavingRange() {
+        let edges = LiquidLensEdges(minX: 93, maxX: 147)
+        let partial = LiquidTabIconVisualModel.state(
+            tabCenterX: 147,
+            lensEdges: edges,
+            baseWidth: 54,
+            reduceMotion: false
+        )
+        let outside = LiquidTabIconVisualModel.state(
+            tabCenterX: 220,
+            lensEdges: edges,
+            baseWidth: 54,
+            reduceMotion: false
+        )
+
+        XCTAssertGreaterThan(partial.influence, 0)
+        XCTAssertLessThan(partial.influence, 1)
+        XCTAssertEqual(outside.influence, 0, accuracy: 0.001)
+        XCTAssertGreaterThanOrEqual(partial.scale, 1)
+        XCTAssertLessThanOrEqual(partial.scale, 1.09)
+    }
+
+    func testReduceMotionKeepsContinuousIconFeedbackButLimitsMovement() {
+        let state = LiquidTabIconVisualModel.state(
+            tabCenterX: 120,
+            lensEdges: LiquidLensEdges(minX: 80, maxX: 160),
+            baseWidth: 54,
+            reduceMotion: true
+        )
+
+        XCTAssertEqual(state.influence, 1, accuracy: 0.001)
+        XCTAssertEqual(state.scale, 1.025, accuracy: 0.001)
+        XCTAssertEqual(state.offsetY, -0.5, accuracy: 0.001)
+        XCTAssertEqual(state.brightness, 0.01, accuracy: 0.001)
+    }
 }

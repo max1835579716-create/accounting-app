@@ -110,9 +110,9 @@ private struct ExpandedLiquidLensGlassStyle: ViewModifier {
                 .opacity(appearance.glassOpacity)
                 .saturation(appearance.saturation)
                 .shadow(
-                    color: appearance.tintColor.opacity(0.10),
-                    radius: 10,
-                    y: 4
+                    color: .black.opacity(0.09),
+                    radius: 8,
+                    y: 3
                 )
         } else {
             content
@@ -125,11 +125,61 @@ private struct ExpandedLiquidLensGlassStyle: ViewModifier {
                 .opacity(appearance.glassOpacity)
                 .saturation(appearance.saturation)
                 .shadow(
-                    color: appearance.tintColor.opacity(0.10),
-                    radius: 10,
-                    y: 4
+                    color: .black.opacity(0.09),
+                    radius: 8,
+                    y: 3
                 )
         }
+    }
+}
+
+private struct ExpandedLiquidLensOpticalEdge<S: InsettableShape>: View {
+    let shape: S
+    let direction: CGFloat
+    let stretch: CGFloat
+
+    private var lightStart: UnitPoint {
+        direction < -0.08 ? .topTrailing : .topLeading
+    }
+
+    private var lightEnd: UnitPoint {
+        direction < -0.08 ? .bottomLeading : .bottomTrailing
+    }
+
+    var body: some View {
+        ZStack {
+            shape
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            .white.opacity(0.26 + Double(stretch) * 0.08),
+                            .white.opacity(0.08),
+                            .clear,
+                            .white.opacity(0.14)
+                        ],
+                        startPoint: lightStart,
+                        endPoint: lightEnd
+                    ),
+                    lineWidth: 0.7
+                )
+                .blendMode(.screen)
+
+            shape
+                .inset(by: 0.8)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            .clear,
+                            .black.opacity(0.045 + Double(stretch) * 0.025)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 0.55
+                )
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 
@@ -208,6 +258,71 @@ private struct LiquidTabLensFallbackTint<S: Shape>: View {
             )
             .blendMode(.plusLighter)
             .allowsHitTesting(false)
+    }
+}
+
+struct LiquidTabIconVisualState: Equatable {
+    let influence: CGFloat
+    let scale: CGFloat
+    let offsetY: CGFloat
+    let brightness: Double
+}
+
+struct LiquidTabIconVisualModel {
+    static func state(
+        tabCenterX: CGFloat,
+        lensEdges: LiquidLensEdges,
+        baseWidth: CGFloat,
+        reduceMotion: Bool
+    ) -> LiquidTabIconVisualState {
+        let falloffRadius = max(baseWidth * 0.78, lensEdges.width * 0.58, 1)
+        let distance = abs(tabCenterX - lensEdges.centerX)
+        let linearInfluence = min(max(1 - distance / falloffRadius, 0), 1)
+        let influence = linearInfluence * linearInfluence * (3 - 2 * linearInfluence)
+        let scaleAmount: CGFloat = reduceMotion ? 0.025 : 0.075
+        let offsetAmount: CGFloat = reduceMotion ? 0.5 : 1.25
+        let brightnessAmount: Double = reduceMotion ? 0.01 : 0.025
+
+        return LiquidTabIconVisualState(
+            influence: influence,
+            scale: 1 + influence * scaleAmount,
+            offsetY: -influence * offsetAmount,
+            brightness: Double(influence) * brightnessAmount
+        )
+    }
+}
+
+private struct LiquidTabIconVisualStyle: ViewModifier {
+    let state: LiquidTabIconVisualState
+    let appearance: ActiveTabGlassAppearance
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        content
+            .foregroundStyle(interpolatedColor)
+            .scaleEffect(state.scale)
+            .offset(y: state.offsetY)
+            .brightness(state.brightness)
+    }
+
+    private var interpolatedColor: Color {
+        let normal = Color.primary.opacity(0.72)
+        if #available(iOS 18.0, *) {
+            return normal.mix(
+                with: appearance.iconColor,
+                by: Double(state.influence),
+                in: .perceptual
+            )
+        }
+
+        let influence = Double(state.influence)
+        let normalComponent = colorScheme == .dark ? 1.0 : 0.0
+        return Color(
+            red: normalComponent + (appearance.iconRed - normalComponent) * influence,
+            green: normalComponent + (appearance.iconGreen - normalComponent) * influence,
+            blue: normalComponent + (appearance.iconBlue - normalComponent) * influence,
+            opacity: 0.72 + 0.28 * influence
+        )
     }
 }
 
@@ -559,6 +674,7 @@ struct FloatingTabBar: View {
     @State private var previousDragTime: Date?
     @State private var snapTask: Task<Void, Never>?
     @State private var committedBeforeRelease = false
+    @Namespace private var glassNamespace
 
     private let barHeight: CGFloat = 68
     private let horizontalMargin: CGFloat = 16
@@ -612,10 +728,9 @@ struct FloatingTabBar: View {
         )
 
         return ZStack(alignment: .leading) {
-            glassSurface(model: model, expandedWidth: expandedWidth)
-                .zIndex(0)
-
             if isCollapsed {
+                glassSurface(model: model, expandedWidth: expandedWidth)
+                    .zIndex(0)
                 collapsedInactiveButtons(model: model, expandedWidth: expandedWidth)
                     .zIndex(1)
                 collapsedActiveLens(model: model, expandedWidth: expandedWidth)
@@ -623,40 +738,13 @@ struct FloatingTabBar: View {
                 collapsedActiveButton(model: model, expandedWidth: expandedWidth)
                     .zIndex(3)
             } else {
-                expandedLiquidLens(
-                    edges: edges,
-                    baseWidth: baseWidth,
-                    appearance: model.activeAppearance
-                )
-                .zIndex(1)
-
-                tabContentLayer(
-                    expandedWidth: expandedWidth,
-                    color: Color.primary.opacity(0.72),
-                    edges: edges,
-                    selectedLayer: false,
-                    measuresCenters: true
-                )
-                .zIndex(2)
-
-                tabContentLayer(
-                    expandedWidth: expandedWidth,
-                    color: model.activeAppearance.iconColor,
-                    edges: edges,
-                    selectedLayer: true,
-                    measuresCenters: false
-                )
-                .mask {
-                    lensMask(edges: edges, baseWidth: baseWidth)
-                }
-                .zIndex(3)
-
-                accessibilityInteractionLayer(
+                expandedNavigationLayers(
+                    model: model,
                     expandedWidth: expandedWidth,
                     centers: centers,
-                    baseWidth: baseWidth
+                    baseWidth: baseWidth,
+                    edges: edges
                 )
-                .zIndex(4)
             }
         }
         .frame(width: expandedWidth, height: barHeight, alignment: .leading)
@@ -680,6 +768,91 @@ struct FloatingTabBar: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(isCollapsed ? "tab-bar-collapsed" : "tab-bar-expanded")
         .accessibilityValue(interactionAccessibilityValue)
+    }
+
+    private func expandedNavigationLayers(
+        model: TabBarAnimationModel,
+        expandedWidth: CGFloat,
+        centers: [CGFloat],
+        baseWidth: CGFloat,
+        edges: LiquidLensEdges
+    ) -> some View {
+        ZStack(alignment: .leading) {
+            expandedGlassLayers(
+                model: model,
+                expandedWidth: expandedWidth,
+                baseWidth: baseWidth,
+                edges: edges
+            )
+            .zIndex(1)
+
+            tabContentLayer(
+                expandedWidth: expandedWidth,
+                centers: centers,
+                edges: edges,
+                baseWidth: baseWidth,
+                appearance: model.activeAppearance
+            )
+            .zIndex(2)
+
+            expandedLiquidLensEdge(
+                edges: edges,
+                baseWidth: baseWidth,
+                centers: centers
+            )
+            .zIndex(3)
+
+            accessibilityInteractionLayer(
+                expandedWidth: expandedWidth,
+                centers: centers,
+                baseWidth: baseWidth
+            )
+            .zIndex(4)
+        }
+    }
+
+    @ViewBuilder
+    private func expandedGlassLayers(
+        model: TabBarAnimationModel,
+        expandedWidth: CGFloat,
+        baseWidth: CGFloat,
+        edges: LiquidLensEdges
+    ) -> some View {
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: 8) {
+                expandedGlassLayerStack(
+                    model: model,
+                    expandedWidth: expandedWidth,
+                    baseWidth: baseWidth,
+                    edges: edges
+                )
+            }
+        } else {
+            expandedGlassLayerStack(
+                model: model,
+                expandedWidth: expandedWidth,
+                baseWidth: baseWidth,
+                edges: edges
+            )
+        }
+    }
+
+    private func expandedGlassLayerStack(
+        model: TabBarAnimationModel,
+        expandedWidth: CGFloat,
+        baseWidth: CGFloat,
+        edges: LiquidLensEdges
+    ) -> some View {
+        ZStack(alignment: .leading) {
+            glassSurface(model: model, expandedWidth: expandedWidth)
+                .zIndex(0)
+            expandedLiquidLens(
+                edges: edges,
+                baseWidth: baseWidth,
+                appearance: model.activeAppearance
+            )
+            .zIndex(1)
+        }
     }
 
     private func glassSurface(
@@ -712,39 +885,66 @@ struct FloatingTabBar: View {
     ) -> some View {
         let height = lensHeight(edges: edges, baseWidth: baseWidth)
         let cornerRadius = height / 2
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
-        return RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .fill(.clear)
-            .frame(width: edges.width, height: height)
-            .modifier(
-                ExpandedLiquidLensGlassStyle(
-                    cornerRadius: cornerRadius,
-                    appearance: appearance
+        return identifiedExpandedLens(
+            shape
+                .fill(.clear)
+                .frame(width: edges.width, height: height)
+                .modifier(
+                    ExpandedLiquidLensGlassStyle(
+                        cornerRadius: cornerRadius,
+                        appearance: appearance
+                    )
                 )
-            )
+        )
             .position(x: edges.centerX, y: barHeight / 2)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
     }
 
-    private func lensMask(
+    private func expandedLiquidLensEdge(
         edges: LiquidLensEdges,
-        baseWidth: CGFloat
+        baseWidth: CGFloat,
+        centers: [CGFloat]
     ) -> some View {
         let height = lensHeight(edges: edges, baseWidth: baseWidth)
+        let shape = RoundedRectangle(cornerRadius: height / 2, style: .continuous)
+        let progressCenterX = LiquidTabGeometry.centerX(
+            for: interaction.selectionProgress,
+            centers: centers
+        )
+        let direction = min(max((edges.centerX - progressCenterX) / max(baseWidth, 1), -1), 1)
+        let stretch = min(max(edges.width / max(baseWidth, 1) - 1, 0), 0.8)
 
-        return RoundedRectangle(cornerRadius: height / 2, style: .continuous)
-            .frame(width: edges.width, height: height)
-            .position(x: edges.centerX, y: barHeight / 2)
-            .allowsHitTesting(false)
+        return ExpandedLiquidLensOpticalEdge(
+            shape: shape,
+            direction: direction,
+            stretch: stretch
+        )
+        .frame(width: edges.width, height: height)
+        .position(x: edges.centerX, y: barHeight / 2)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private func identifiedExpandedLens<Content: View>(
+        _ content: Content
+    ) -> some View {
+        if #available(iOS 26.0, *) {
+            content.glassEffectID("expanded-liquid-tab-lens", in: glassNamespace)
+        } else {
+            content
+        }
     }
 
     private func tabContentLayer(
         expandedWidth: CGFloat,
-        color: Color,
+        centers: [CGFloat],
         edges: LiquidLensEdges,
-        selectedLayer: Bool,
-        measuresCenters: Bool
+        baseWidth: CGFloat,
+        appearance: ActiveTabGlassAppearance
     ) -> some View {
         let contentWidth = max(
             expandedWidth - TabBarAnimationModel.horizontalInset * 2,
@@ -753,26 +953,35 @@ struct FloatingTabBar: View {
 
         return HStack(spacing: 0) {
             ForEach(AppTab.allCases) { tab in
+                let index = AppTab.allCases.firstIndex(of: tab) ?? 0
+                let tabCenterX = centers.indices.contains(index)
+                    ? centers[index]
+                    : 0
+                let visualState = LiquidTabIconVisualModel.state(
+                    tabCenterX: tabCenterX,
+                    lensEdges: edges,
+                    baseWidth: baseWidth,
+                    reduceMotion: reduceMotion
+                )
+
                 AppTabIconView(tab: tab)
-                    .foregroundStyle(color)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .scaleEffect(
-                        selectedLayer
-                            ? selectedContentScale(for: tab, edges: edges)
-                            : 1
+                    .modifier(
+                        LiquidTabIconVisualStyle(
+                            state: visualState,
+                            appearance: appearance
+                        )
                     )
                     .background {
-                        if measuresCenters {
-                            GeometryReader { geometry in
-                                Color.clear.preference(
-                                    key: LiquidTabCenterPreferenceKey.self,
-                                    value: [
-                                        tab: geometry.frame(
-                                            in: .named(dragCoordinateSpace)
-                                        ).midX
-                                    ]
-                                )
-                            }
+                        GeometryReader { geometry in
+                            Color.clear.preference(
+                                key: LiquidTabCenterPreferenceKey.self,
+                                value: [
+                                    tab: geometry.frame(
+                                        in: .named(dragCoordinateSpace)
+                                    ).midX
+                                ]
+                            )
                         }
                     }
             }
@@ -1124,20 +1333,6 @@ struct FloatingTabBar: View {
         let stretch = max(edges.width / max(baseWidth, 1) - 1, 0)
         let compression = reduceMotion ? 0 : min(stretch * 0.04, 0.03)
         return TabBarAnimationModel.collapsedDiameter * (1 - compression)
-    }
-
-    private func selectedContentScale(
-        for tab: AppTab,
-        edges: LiquidLensEdges
-    ) -> CGFloat {
-        guard !reduceMotion, let centerX = measuredTabCenters[tab] else { return 1 }
-        let iconHalfWidth: CGFloat = 27
-        let overlap = max(
-            min(edges.maxX, centerX + iconHalfWidth)
-                - max(edges.minX, centerX - iconHalfWidth),
-            0
-        )
-        return 1 + min(overlap / (iconHalfWidth * 2), 1) * 0.08
     }
 
     private func dragVelocity(

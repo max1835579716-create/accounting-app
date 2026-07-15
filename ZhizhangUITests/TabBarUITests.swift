@@ -229,6 +229,43 @@ final class TabBarUITests: XCTestCase {
         XCTAssertEqual(selectedCount, 1)
     }
 
+    func testVisualSlowFullWidthDragAndFiveRapidReversals() {
+        let app = XCUIApplication()
+        app.launch()
+
+        let expandedBar = app.descendants(matching: .any)["tab-bar-expanded"]
+        let analysis = app.buttons["tab-analysis"]
+        let more = app.buttons["tab-more"]
+        XCTAssertTrue(expandedBar.waitForExistence(timeout: 5))
+        XCTAssertTrue(analysis.waitForExistence(timeout: 5))
+        XCTAssertTrue(more.waitForExistence(timeout: 5))
+
+        analysis.press(
+            forDuration: 0.2,
+            thenDragTo: more,
+            withVelocity: .slow,
+            thenHoldForDuration: 0.6
+        )
+        XCTAssertEqual(more.value as? String, "single-active-control")
+
+        var current = more
+        for destination in [analysis, more, analysis, more, analysis] {
+            current.press(
+                forDuration: 0.05,
+                thenDragTo: destination,
+                withVelocity: .fast,
+                thenHoldForDuration: 0.08
+            )
+            current = destination
+        }
+
+        XCTAssertEqual(analysis.value as? String, "single-active-control")
+        XCTAssertTrue(
+            (expandedBar.value as? String)?.contains("preReleaseCommit=false") == true
+        )
+        keepScreenshot(app, named: "Single icon liquid glass drag sequence")
+    }
+
     func testCollapsedBarRetainsSavingsTab() {
         let app = XCUIApplication()
         app.launchArguments.append("--many-savings-goals")
