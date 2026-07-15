@@ -1,19 +1,9 @@
 import SwiftUI
 
-private enum EntryDestination: String, Identifiable {
-    case add
-    var id: String { rawValue }
-}
-
 struct CalendarLedgerView: View {
     let store: AppStore
+    let onAddTransaction: () -> Void
     @State private var shownMonth = Date.now
-    @State private var destination: EntryDestination?
-
-    init(store: AppStore) {
-        self.store = store
-        _destination = State(initialValue: ProcessInfo.processInfo.arguments.contains("--show-entry") ? .add : nil)
-    }
 
     var body: some View {
         CollapsingScrollView(isCollapsed: collapseBinding) {
@@ -27,42 +17,23 @@ struct CalendarLedgerView: View {
             .padding(.top, 12)
             .padding(.bottom, 32)
         }
-        .sheet(item: $destination) { _ in
-            AddTransactionSheet(store: store, initialDate: store.selectedDate)
-                .presentationDetents([.fraction(0.78), .large])
-                .presentationDragIndicator(.visible)
-                .presentationCornerRadius(32)
-        }
     }
 
     private var header: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Menu {
-                    Button("日常账本", action: {})
-                    Button("家庭账本", action: {})
-                    Button("旅行账本", action: {})
-                } label: {
-                    HStack(spacing: 8) {
-                        Text("日常账本").font(.largeTitle.bold()).foregroundStyle(.primary)
-                        Image(systemName: "chevron.down").font(.caption.bold())
-                    }
-                }
-                Text("快速回看，也能随手记下").font(.subheadline).foregroundStyle(.secondary)
-            }
-            Spacer()
-            Button {
-                destination = .add
+        VStack(alignment: .leading, spacing: 4) {
+            Menu {
+                Button("日常账本", action: {})
+                Button("家庭账本", action: {})
+                Button("旅行账本", action: {})
             } label: {
-                Image(systemName: "plus")
-                    .font(.title3.bold())
-                    .frame(width: 46, height: 46)
+                HStack(spacing: 8) {
+                    Text("日常账本").font(.largeTitle.bold()).foregroundStyle(.primary)
+                    Image(systemName: "chevron.down").font(.caption.bold())
+                }
             }
-            .buttonStyle(.plain)
-            .glassCircle(interactive: true)
-            .accessibilityLabel("新增账单")
-            .accessibilityIdentifier("add-transaction")
+            Text("快速回看，也能随手记下").font(.subheadline).foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var calendarCard: some View {
@@ -111,9 +82,7 @@ struct CalendarLedgerView: View {
             }
 
             if items.isEmpty {
-                Button {
-                    destination = .add
-                } label: {
+                Button(action: onAddTransaction) {
                     Label("记下第一笔", systemImage: "plus.circle.fill")
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)

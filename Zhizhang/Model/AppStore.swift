@@ -4,7 +4,7 @@ import Observation
 @MainActor
 @Observable
 final class AppStore {
-    var selectedTab: AppTab = .analysis
+    var selectedTab: AppTab = .calendar
     var transactions: [Transaction]
     var isTabBarCollapsed = false
     var selectedDate = Calendar.current.startOfDay(for: .now)

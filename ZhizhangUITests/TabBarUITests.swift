@@ -2,6 +2,45 @@ import XCTest
 
 @MainActor
 final class TabBarUITests: XCTestCase {
+    func testColdLaunchShowsCalendarHomeWithoutHeaderAddButton() {
+        let app = XCUIApplication()
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["日常账本"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(
+            app.buttons["tab-calendar"].value as? String,
+            "single-active-control"
+        )
+        XCTAssertFalse(app.buttons["add-transaction"].exists)
+        XCTAssertFalse(app.staticTexts["记一笔"].exists)
+    }
+
+    func testCalendarTabOpensQuickEntryOnlyOnExplicitReselection() {
+        let app = XCUIApplication()
+        app.launch()
+
+        app.buttons["tab-bills"].tap()
+        XCTAssertTrue(app.staticTexts["账单"].firstMatch.waitForExistence(timeout: 5))
+
+        app.buttons["tab-calendar"].tap()
+        XCTAssertTrue(app.staticTexts["日常账本"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["记一笔"].exists)
+
+        app.buttons["tab-calendar"].tap()
+        XCTAssertTrue(app.staticTexts["记一笔"].waitForExistence(timeout: 5))
+        XCTAssertEqual(
+            app.staticTexts.matching(identifier: "记一笔").count,
+            1
+        )
+
+        app.buttons["关闭"].tap()
+        XCTAssertTrue(app.staticTexts["日常账本"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(
+            app.buttons["tab-calendar"].value as? String,
+            "single-active-control"
+        )
+    }
+
     func testTabBarMinimizesAndRestoresWhileScrolling() {
         let app = XCUIApplication()
         app.launch()
@@ -77,6 +116,8 @@ final class TabBarUITests: XCTestCase {
         let targetTab = app.buttons["tab-savings"]
         XCTAssertTrue(startTab.waitForExistence(timeout: 5))
         XCTAssertTrue(targetTab.waitForExistence(timeout: 5))
+        startTab.tap()
+        XCTAssertTrue(app.staticTexts["明细"].firstMatch.waitForExistence(timeout: 5))
 
         startTab.press(forDuration: 0.15, thenDragTo: targetTab)
 
@@ -97,6 +138,8 @@ final class TabBarUITests: XCTestCase {
         XCTAssertTrue(expandedBar.waitForExistence(timeout: 5))
         XCTAssertTrue(startTab.waitForExistence(timeout: 5))
         XCTAssertTrue(targetTab.waitForExistence(timeout: 5))
+        startTab.tap()
+        XCTAssertTrue(app.staticTexts["明细"].firstMatch.waitForExistence(timeout: 5))
 
         startTab.press(
             forDuration: 0.15,
@@ -116,6 +159,8 @@ final class TabBarUITests: XCTestCase {
 
         let startTab = app.buttons["tab-analysis"]
         XCTAssertTrue(startTab.waitForExistence(timeout: 5))
+        startTab.tap()
+        XCTAssertTrue(app.staticTexts["明细"].firstMatch.waitForExistence(timeout: 5))
         let start = startTab.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         let nearby = start.withOffset(CGVector(dx: 3, dy: 0))
 
@@ -134,6 +179,8 @@ final class TabBarUITests: XCTestCase {
 
         let expandedBar = app.descendants(matching: .any)["tab-bar-expanded"]
         XCTAssertTrue(expandedBar.waitForExistence(timeout: 5))
+        app.buttons["tab-analysis"].tap()
+        XCTAssertTrue(app.staticTexts["明细"].firstMatch.waitForExistence(timeout: 5))
         let blankStart = expandedBar.coordinate(
             withNormalizedOffset: CGVector(dx: 0.40, dy: 0.5)
         )
@@ -192,6 +239,8 @@ final class TabBarUITests: XCTestCase {
         let dragEnd = app.buttons["tab-savings"]
         XCTAssertTrue(unselectedStart.waitForExistence(timeout: 5))
         XCTAssertTrue(dragEnd.waitForExistence(timeout: 5))
+        app.buttons["tab-analysis"].tap()
+        XCTAssertTrue(app.staticTexts["明细"].firstMatch.waitForExistence(timeout: 5))
 
         unselectedStart.press(
             forDuration: 0.15,
@@ -239,6 +288,8 @@ final class TabBarUITests: XCTestCase {
         XCTAssertTrue(expandedBar.waitForExistence(timeout: 5))
         XCTAssertTrue(analysis.waitForExistence(timeout: 5))
         XCTAssertTrue(more.waitForExistence(timeout: 5))
+        analysis.tap()
+        XCTAssertTrue(app.staticTexts["明细"].firstMatch.waitForExistence(timeout: 5))
 
         analysis.press(
             forDuration: 0.2,

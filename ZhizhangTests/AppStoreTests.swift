@@ -3,6 +3,24 @@ import XCTest
 
 @MainActor
 final class AppStoreTests: XCTestCase {
+    func testNewStoreDefaultsToCalendarHome() {
+        XCTAssertEqual(AppStore().selectedTab, .calendar)
+    }
+
+    func testActivatingUnselectedCalendarSelectsTheFormalTab() {
+        XCTAssertEqual(
+            TabSelectionRouting.activation(current: .bills, target: .calendar),
+            .select(.calendar)
+        )
+    }
+
+    func testActivatingSelectedCalendarIsAReselection() {
+        XCTAssertEqual(
+            TabSelectionRouting.activation(current: .calendar, target: .calendar),
+            .reselect(.calendar)
+        )
+    }
+
     func testCompactDateTitleShowsToday() {
         XCTAssertEqual(
             CompactDateTitle.text(for: .now, calendar: .current),

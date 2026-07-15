@@ -682,9 +682,21 @@ private struct LiquidTabCenterPreferenceKey: PreferenceKey {
     }
 }
 
+enum TabActivation: Equatable {
+    case select(AppTab)
+    case reselect(AppTab)
+}
+
+struct TabSelectionRouting {
+    static func activation(current: AppTab, target: AppTab) -> TabActivation {
+        current == target ? .reselect(target) : .select(target)
+    }
+}
+
 struct FloatingTabBar: View {
     @Binding var selection: AppTab
     @Binding var isCollapsed: Bool
+    let onReselect: (AppTab) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var collapseProgress: CGFloat = 0
     @State private var interaction = LiquidTabSelectionState(committedIndex: 0)
@@ -1062,7 +1074,8 @@ struct FloatingTabBar: View {
                         commitTab(
                             at: index,
                             centers: centers,
-                            baseWidth: baseWidth
+                            baseWidth: baseWidth,
+                            activatesReselection: true
                         )
                     }
             }
@@ -1178,11 +1191,13 @@ struct FloatingTabBar: View {
                 )
             }
 
+            let activatesReselection = !exceededDragThreshold
             finishGestureTracking()
             commitTab(
                 at: targetIndex,
                 centers: centers,
-                baseWidth: baseWidth
+                baseWidth: baseWidth,
+                activatesReselection: activatesReselection
             )
         }
     }
@@ -1190,11 +1205,21 @@ struct FloatingTabBar: View {
     private func commitTab(
         at index: Int,
         centers: [CGFloat],
-        baseWidth: CGFloat
+        baseWidth: CGFloat,
+        activatesReselection: Bool = false
     ) {
         let validIndex = min(max(index, 0), AppTab.allCases.count - 1)
+        let target = AppTab.allCases[validIndex]
+
+        if activatesReselection,
+           TabSelectionRouting.activation(current: selection, target: target)
+            == .reselect(target) {
+            onReselect(target)
+            return
+        }
+
         interaction.commit(index: validIndex, preservingPreview: true)
-        selection = AppTab.allCases[validIndex]
+        selection = target
         startSnap(
             to: validIndex,
             centers: centers,
