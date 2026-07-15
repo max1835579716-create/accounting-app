@@ -67,6 +67,168 @@ final class TabBarUITests: XCTestCase {
         keepScreenshot(app, named: "Bar expanded from retained icon")
     }
 
+    func testExpandedTabBarSupportsHorizontalDragSelection() {
+        let app = XCUIApplication()
+        app.launch()
+
+        XCTAssertTrue(app.descendants(matching: .any)["tab-bar-expanded"].waitForExistence(timeout: 5))
+
+        let startTab = app.buttons["tab-analysis"]
+        let targetTab = app.buttons["tab-savings"]
+        XCTAssertTrue(startTab.waitForExistence(timeout: 5))
+        XCTAssertTrue(targetTab.waitForExistence(timeout: 5))
+
+        startTab.press(forDuration: 0.15, thenDragTo: targetTab)
+
+        XCTAssertTrue(app.staticTexts["攒钱"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(
+            targetTab.value as? String,
+            "single-active-control"
+        )
+    }
+
+    func testHeldDragDoesNotCommitPageBeforeRelease() {
+        let app = XCUIApplication()
+        app.launch()
+
+        let expandedBar = app.descendants(matching: .any)["tab-bar-expanded"]
+        let startTab = app.buttons["tab-analysis"]
+        let targetTab = app.buttons["tab-savings"]
+        XCTAssertTrue(expandedBar.waitForExistence(timeout: 5))
+        XCTAssertTrue(startTab.waitForExistence(timeout: 5))
+        XCTAssertTrue(targetTab.waitForExistence(timeout: 5))
+
+        startTab.press(
+            forDuration: 0.15,
+            thenDragTo: targetTab,
+            withVelocity: .slow,
+            thenHoldForDuration: 3
+        )
+
+        XCTAssertTrue(app.staticTexts["攒钱"].firstMatch.waitForExistence(timeout: 5))
+        let interactionValue = app.descendants(matching: .any)["tab-bar-expanded"].value as? String
+        XCTAssertTrue(interactionValue?.contains("preReleaseCommit=false") == true)
+    }
+
+    func testSlightDragReturnsToCommittedPage() {
+        let app = XCUIApplication()
+        app.launch()
+
+        let startTab = app.buttons["tab-analysis"]
+        XCTAssertTrue(startTab.waitForExistence(timeout: 5))
+        let start = startTab.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let nearby = start.withOffset(CGVector(dx: 3, dy: 0))
+
+        start.press(forDuration: 0.15, thenDragTo: nearby)
+
+        XCTAssertTrue(app.staticTexts["明细"].firstMatch.waitForExistence(timeout: 2))
+        XCTAssertEqual(
+            app.buttons["tab-analysis"].value as? String,
+            "single-active-control"
+        )
+    }
+
+    func testDragCanStartBetweenTabIcons() {
+        let app = XCUIApplication()
+        app.launch()
+
+        let expandedBar = app.descendants(matching: .any)["tab-bar-expanded"]
+        XCTAssertTrue(expandedBar.waitForExistence(timeout: 5))
+        let blankStart = expandedBar.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.40, dy: 0.5)
+        )
+        let dragEnd = expandedBar.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.75, dy: 0.5)
+        )
+
+        blankStart.press(
+            forDuration: 0.15,
+            thenDragTo: dragEnd,
+            withVelocity: .slow,
+            thenHoldForDuration: 0.4
+        )
+
+        let selectedIdentifier = [
+            "tab-analysis",
+            "tab-bills",
+            "tab-calendar",
+            "tab-savings",
+            "tab-more"
+        ].first { identifier in
+            app.buttons[identifier].value as? String == "single-active-control"
+        }
+        XCTAssertEqual(selectedIdentifier, "tab-calendar")
+    }
+
+    func testReverseDragCommitsOnlyOnRelease() {
+        let app = XCUIApplication()
+        app.launch()
+
+        let savings = app.buttons["tab-savings"]
+        let bills = app.buttons["tab-bills"]
+        XCTAssertTrue(savings.waitForExistence(timeout: 5))
+        savings.tap()
+        XCTAssertTrue(app.staticTexts["攒钱"].firstMatch.waitForExistence(timeout: 5))
+
+        savings.press(
+            forDuration: 0.15,
+            thenDragTo: bills,
+            withVelocity: .slow,
+            thenHoldForDuration: 0.4
+        )
+
+        XCTAssertTrue(app.staticTexts["账单"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            (app.descendants(matching: .any)["tab-bar-expanded"].value as? String)?
+                .contains("preReleaseCommit=false") == true
+        )
+    }
+
+    func testDragCanStartOnUnselectedIcon() {
+        let app = XCUIApplication()
+        app.launch()
+
+        let unselectedStart = app.buttons["tab-bills"]
+        let dragEnd = app.buttons["tab-savings"]
+        XCTAssertTrue(unselectedStart.waitForExistence(timeout: 5))
+        XCTAssertTrue(dragEnd.waitForExistence(timeout: 5))
+
+        unselectedStart.press(
+            forDuration: 0.15,
+            thenDragTo: dragEnd,
+            withVelocity: .slow,
+            thenHoldForDuration: 0.4
+        )
+
+        XCTAssertEqual(
+            app.buttons["tab-calendar"].value as? String,
+            "single-active-control"
+        )
+    }
+
+    func testRapidClicksLeaveExactlyOneCommittedTab() {
+        let app = XCUIApplication()
+        app.launch()
+
+        XCTAssertTrue(app.buttons["tab-analysis"].waitForExistence(timeout: 5))
+        app.buttons["tab-more"].tap()
+        app.buttons["tab-bills"].tap()
+        app.buttons["tab-calendar"].tap()
+        app.buttons["tab-savings"].tap()
+
+        XCTAssertTrue(app.staticTexts["攒钱"].firstMatch.waitForExistence(timeout: 5))
+        let selectedCount = [
+            "tab-analysis",
+            "tab-bills",
+            "tab-calendar",
+            "tab-savings",
+            "tab-more"
+        ].filter { identifier in
+            app.buttons[identifier].value as? String == "single-active-control"
+        }.count
+        XCTAssertEqual(selectedCount, 1)
+    }
+
     func testCollapsedBarRetainsSavingsTab() {
         let app = XCUIApplication()
         app.launchArguments.append("--many-savings-goals")

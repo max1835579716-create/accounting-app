@@ -186,7 +186,7 @@ final class AppStoreTests: XCTestCase {
         ).activeAppearance
 
         XCTAssertEqual(expanded, collapsed)
-        XCTAssertEqual(collapsed.tintOpacity, 0.14, accuracy: 0.001)
+        XCTAssertEqual(collapsed.tintOpacity, 0.08, accuracy: 0.001)
         XCTAssertEqual(collapsed.iconRed, 0.88, accuracy: 0.001)
         XCTAssertEqual(collapsed.iconGreen, 0.20, accuracy: 0.001)
         XCTAssertEqual(collapsed.iconBlue, 0.32, accuracy: 0.001)
@@ -203,5 +203,95 @@ final class AppStoreTests: XCTestCase {
             TabBarAnimationModel(progress: 1, selectedTab: .savings).collapsedTabIdentifier,
             "collapsed-tab-savings"
         )
+    }
+
+    func testLiquidTabGeometryInterpolatesBetweenMeasuredCenters() {
+        let centers: [CGFloat] = [24, 96, 216]
+
+        XCTAssertEqual(
+            LiquidTabGeometry.progress(for: 60, centers: centers),
+            0.5,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            LiquidTabGeometry.progress(for: 156, centers: centers),
+            1.5,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            LiquidTabGeometry.centerX(for: 1.5, centers: centers),
+            156,
+            accuracy: 0.001
+        )
+    }
+
+    func testDragPreviewNeverMutatesCommittedIndex() {
+        var state = LiquidTabSelectionState(committedIndex: 0)
+        let centers: [CGFloat] = [24, 96, 168, 240, 312]
+
+        state.beginDrag()
+        state.updateDrag(translationX: 198, centers: centers)
+
+        XCTAssertEqual(state.committedIndex, 0)
+        XCTAssertEqual(state.previewIndex, 3)
+        XCTAssertEqual(state.selectionProgress, 2.75, accuracy: 0.001)
+    }
+
+    func testRightwardDragExtendsFrontEdgeMoreThanRearEdge() {
+        let edges = LiquidTabGeometry.draggedEdges(
+            centerX: 120,
+            velocityX: 900,
+            baseWidth: 54,
+            reduceMotion: false
+        )
+        let frontExtension = edges.maxX - (120 + 27)
+        let rearExtension = (120 - 27) - edges.minX
+
+        XCTAssertGreaterThan(frontExtension, rearExtension)
+        XCTAssertLessThanOrEqual(edges.width, 54 * 1.8 + 0.001)
+    }
+
+    func testLeftwardDragExtendsFrontEdgeMoreThanRearEdge() {
+        let edges = LiquidTabGeometry.draggedEdges(
+            centerX: 120,
+            velocityX: -900,
+            baseWidth: 54,
+            reduceMotion: false
+        )
+        let frontExtension = (120 - 27) - edges.minX
+        let rearExtension = edges.maxX - (120 + 27)
+
+        XCTAssertGreaterThan(frontExtension, rearExtension)
+        XCTAssertLessThanOrEqual(edges.width, 54 * 1.8 + 0.001)
+    }
+
+    func testReleaseBelowDragThresholdReturnsCommittedTab() {
+        XCTAssertEqual(
+            LiquidTabGeometry.releaseTarget(
+                progress: 1.9,
+                predictedTranslationRemainder: 80,
+                centers: [24, 96, 168, 240, 312],
+                committedIndex: 0,
+                exceededDragThreshold: false
+            ),
+            0
+        )
+    }
+
+    func testIndependentEdgesStayBoundedAndSettleRound() {
+        var motion = LiquidLensMotionState(centerX: 24, width: 54)
+
+        for _ in 0..<180 {
+            motion.step(
+                towardCenterX: 240,
+                baseWidth: 54,
+                deltaTime: 1 / 120,
+                reduceMotion: false
+            )
+            XCTAssertLessThanOrEqual(motion.edges.width, 54 * 1.8 + 0.001)
+        }
+
+        XCTAssertEqual(motion.edges.centerX, 240, accuracy: 0.35)
+        XCTAssertEqual(motion.edges.width, 54, accuracy: 0.35)
     }
 }
