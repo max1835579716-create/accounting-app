@@ -327,6 +327,27 @@ final class TabBarUITests: XCTestCase {
         )
     }
 
+    func testKeypadDateButtonOpensDatePickerWithoutReplacingNoteField() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--calendar", "--show-entry"]
+        app.launch()
+
+        let dateButton = app.buttons["transaction-date-button"]
+        let noteField = app.textFields["补充说明"]
+        XCTAssertTrue(dateButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(noteField.exists)
+        XCTAssertEqual(
+            app.buttons.matching(identifier: "transaction-date-button").count,
+            1
+        )
+
+        dateButton.tap()
+
+        XCTAssertTrue(app.staticTexts["选择日期"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["取消"].exists)
+        XCTAssertTrue(app.buttons["完成"].exists)
+    }
+
     private func waitForStableFrame(
         _ element: XCUIElement,
         timeout: TimeInterval = 3

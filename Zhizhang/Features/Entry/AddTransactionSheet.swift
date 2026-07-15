@@ -1,5 +1,11 @@
 import SwiftUI
 
+private enum AddTransactionDestination: String, Identifiable {
+    case datePicker
+
+    var id: String { rawValue }
+}
+
 struct AddTransactionSheet: View {
     @Environment(\.dismiss) private var dismiss
     let store: AppStore
@@ -9,11 +15,14 @@ struct AddTransactionSheet: View {
     @State private var account = "支付宝"
     @State private var merchant = ""
     @State private var note = ""
-    @State private var date: Date
+    @State private var selectedDate: Date
+    @State private var draftDate: Date
+    @State private var destination: AddTransactionDestination?
 
     init(store: AppStore, initialDate: Date) {
         self.store = store
-        _date = State(initialValue: initialDate)
+        _selectedDate = State(initialValue: initialDate)
+        _draftDate = State(initialValue: initialDate)
     }
 
     var body: some View {
@@ -26,12 +35,25 @@ struct AddTransactionSheet: View {
 
             categoryGrid
             inputBar
-            AmountKeypad(value: $amount, onComplete: save)
+            AmountKeypad(
+                value: $amount,
+                dateTitle: CompactDateTitle.text(for: selectedDate),
+                onDateTap: openDatePicker,
+                onComplete: save
+            )
         }
         .padding(.horizontal, 18)
         .padding(.bottom, 12)
         .onChange(of: kind) { _, newValue in
             category = newValue == .expense ? .dining : .salary
+        }
+        .sheet(item: $destination) { _ in
+            TransactionDatePickerSheet(
+                selectedDate: $selectedDate,
+                draftDate: $draftDate
+            )
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
         }
     }
 
@@ -85,9 +107,15 @@ struct AddTransactionSheet: View {
                         Button(value) { account = value }
                     }
                 }
-                DatePicker("", selection: $date, displayedComponents: .date).labelsHidden()
-                TextField("补充说明", text: $note).font(.caption)
+                .fixedSize(horizontal: true, vertical: false)
+                TextField("补充说明", text: $note)
+                    .font(.caption)
+                    .frame(maxWidth: .infinity)
+                    .layoutPriority(1)
+                    .accessibilityIdentifier("supplementary-note")
                 Button(action: {}) { Image(systemName: "camera") }
+                    .fixedSize()
+                    .accessibilityIdentifier("camera-button")
             }
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -107,8 +135,47 @@ struct AddTransactionSheet: View {
             account: account,
             merchant: merchant,
             note: note,
-            date: date
+            date: selectedDate
         )
         dismiss()
+    }
+
+    private func openDatePicker() {
+        draftDate = selectedDate
+        destination = .datePicker
+    }
+}
+
+private struct TransactionDatePickerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var selectedDate: Date
+    @Binding var draftDate: Date
+
+    var body: some View {
+        NavigationStack {
+            DatePicker(
+                "交易日期",
+                selection: $draftDate,
+                displayedComponents: .date
+            )
+            .datePickerStyle(.graphical)
+            .labelsHidden()
+            .padding(.horizontal, 18)
+            .navigationTitle("选择日期")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                        .accessibilityIdentifier("date-picker-cancel")
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") {
+                        selectedDate = draftDate
+                        dismiss()
+                    }
+                    .accessibilityIdentifier("date-picker-done")
+                }
+            }
+        }
     }
 }

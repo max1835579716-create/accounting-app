@@ -3,6 +3,31 @@ import XCTest
 
 @MainActor
 final class AppStoreTests: XCTestCase {
+    func testCompactDateTitleShowsToday() {
+        XCTAssertEqual(
+            CompactDateTitle.text(for: .now, calendar: .current),
+            "今天"
+        )
+    }
+
+    func testCompactDateTitleUsesUnpaddedMonthAndDay() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+        let examples = [
+            (DateComponents(year: 2099, month: 7, day: 18), "7.18"),
+            (DateComponents(year: 2099, month: 8, day: 3), "8.3"),
+            (DateComponents(year: 2099, month: 11, day: 6), "11.6")
+        ]
+
+        for (components, expectedTitle) in examples {
+            let date = try XCTUnwrap(calendar.date(from: components))
+            XCTAssertEqual(
+                CompactDateTitle.text(for: date, calendar: calendar),
+                expectedTitle
+            )
+        }
+    }
+
     func testDemoTransactionsProduceExpectedMonthlyTotals() {
         let store = AppStore.demo
 
