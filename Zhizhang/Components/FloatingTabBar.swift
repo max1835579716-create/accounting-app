@@ -29,6 +29,19 @@ struct ActiveTabGlassAppearance: Equatable {
         highlightOpacity: 0.52
     )
 
+    static let branded = ActiveTabGlassAppearance(
+        tintRed: BrandedTabBarStyle.Selection.red,
+        tintGreen: BrandedTabBarStyle.Selection.green,
+        tintBlue: BrandedTabBarStyle.Selection.blue,
+        tintOpacity: BrandedTabBarStyle.Selection.tintOpacity,
+        iconRed: BrandedTabBarStyle.Selection.red,
+        iconGreen: BrandedTabBarStyle.Selection.green,
+        iconBlue: BrandedTabBarStyle.Selection.blue,
+        glassOpacity: BrandedTabBarStyle.Selection.glassOpacity,
+        saturation: BrandedTabBarStyle.Selection.saturation,
+        highlightOpacity: BrandedTabBarStyle.Selection.highlightOpacity
+    )
+
     let tintRed: Double
     let tintGreen: Double
     let tintBlue: Double
@@ -62,6 +75,7 @@ struct ActiveTabGlassStyle: ViewModifier {
 
         if #available(iOS 26.0, *) {
             content
+                .background(BrandedTabBarStyle.Selection.fill, in: shape)
                 .glassEffect(
                     .regular
                         .tint(appearance.tintColor.opacity(appearance.tintOpacity))
@@ -111,25 +125,55 @@ private struct ExpandedLiquidLensGlassStyle: ViewModifier {
                 .opacity(appearance.glassOpacity)
                 .saturation(appearance.saturation)
                 .shadow(
-                    color: .black.opacity(0.09),
-                    radius: 8,
-                    y: 3
+                    color: BrandedTabBarStyle.Selection.shadow.color,
+                    radius: BrandedTabBarStyle.Selection.shadow.radius,
+                    x: BrandedTabBarStyle.Selection.shadow.x,
+                    y: BrandedTabBarStyle.Selection.shadow.y
                 )
         } else {
             content
                 .background(.ultraThinMaterial, in: shape)
                 .overlay {
-                    shape.fill(
-                        appearance.tintColor.opacity(appearance.tintOpacity)
-                    )
+                    shape.fill(BrandedTabBarStyle.Selection.fill)
                 }
                 .opacity(appearance.glassOpacity)
                 .saturation(appearance.saturation)
                 .shadow(
-                    color: .black.opacity(0.09),
-                    radius: 8,
-                    y: 3
+                    color: BrandedTabBarStyle.Selection.shadow.color,
+                    radius: BrandedTabBarStyle.Selection.shadow.radius,
+                    x: BrandedTabBarStyle.Selection.shadow.x,
+                    y: BrandedTabBarStyle.Selection.shadow.y
                 )
+        }
+    }
+}
+
+private struct BrandedTabBarCapsuleGlassStyle: ViewModifier {
+    let cornerRadius: CGFloat
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
+        if #available(iOS 26.0, *) {
+            content
+                .background(BrandedTabBarStyle.Capsule.fill, in: shape)
+                .glassEffect(
+                    .regular.tint(
+                        BrandedTabBarStyle.Capsule.tint.opacity(
+                            BrandedTabBarStyle.Capsule.tintOpacity
+                        )
+                    ),
+                    in: .rect(cornerRadius: cornerRadius)
+                )
+                .opacity(BrandedTabBarStyle.Capsule.opacity)
+                .saturation(BrandedTabBarStyle.Capsule.saturation)
+        } else {
+            content
+                .background(.ultraThinMaterial, in: shape)
+                .overlay { shape.fill(BrandedTabBarStyle.Capsule.fill) }
+                .opacity(BrandedTabBarStyle.Capsule.opacity)
+                .saturation(BrandedTabBarStyle.Capsule.saturation)
         }
     }
 }
@@ -153,10 +197,12 @@ private struct ExpandedLiquidLensOpticalEdge<S: InsettableShape>: View {
                 .strokeBorder(
                     LinearGradient(
                         colors: [
-                            .white.opacity(0.26 + Double(stretch) * 0.08),
-                            .white.opacity(0.08),
+                            BrandedTabBarStyle.Selection.highlight.opacity(
+                                0.26 + Double(stretch) * 0.08
+                            ),
+                            BrandedTabBarStyle.Selection.highlight.opacity(0.08),
                             .clear,
-                            .white.opacity(0.14)
+                            BrandedTabBarStyle.Selection.highlight.opacity(0.14)
                         ],
                         startPoint: lightStart,
                         endPoint: lightEnd
@@ -171,7 +217,9 @@ private struct ExpandedLiquidLensOpticalEdge<S: InsettableShape>: View {
                     LinearGradient(
                         colors: [
                             .clear,
-                            .black.opacity(0.045 + Double(stretch) * 0.025)
+                            BrandedTabBarStyle.Selection.lowerEdge.opacity(
+                                0.45 + Double(stretch) * 0.20
+                            )
                         ],
                         startPoint: .top,
                         endPoint: .bottom
@@ -307,7 +355,7 @@ private struct LiquidTabIconVisualStyle: ViewModifier {
     }
 
     private var interpolatedColor: Color {
-        let normal = Color.primary.opacity(0.72)
+        let normal = BrandedTabBarStyle.Item.inactive
         if #available(iOS 18.0, *) {
             return normal.mix(
                 with: appearance.iconColor,
@@ -317,12 +365,15 @@ private struct LiquidTabIconVisualStyle: ViewModifier {
         }
 
         let influence = Double(state.influence)
-        let normalComponent = colorScheme == .dark ? 1.0 : 0.0
+        let inactiveRed = BrandedTabBarStyle.Item.inactiveRed
+        let inactiveGreen = BrandedTabBarStyle.Item.inactiveGreen
+        let inactiveBlue = BrandedTabBarStyle.Item.inactiveBlue
+        let inactiveOpacity = BrandedTabBarStyle.Item.inactiveOpacity
         return Color(
-            red: normalComponent + (appearance.iconRed - normalComponent) * influence,
-            green: normalComponent + (appearance.iconGreen - normalComponent) * influence,
-            blue: normalComponent + (appearance.iconBlue - normalComponent) * influence,
-            opacity: 0.72 + 0.28 * influence
+            red: inactiveRed + (appearance.iconRed - inactiveRed) * influence,
+            green: inactiveGreen + (appearance.iconGreen - inactiveGreen) * influence,
+            blue: inactiveBlue + (appearance.iconBlue - inactiveBlue) * influence,
+            opacity: inactiveOpacity + (1 - inactiveOpacity) * influence
         )
     }
 }
@@ -833,7 +884,7 @@ struct FloatingTabBar: View {
                 centers: centers,
                 edges: edges,
                 baseWidth: baseWidth,
-                appearance: model.activeAppearance
+                appearance: .branded
             )
             .zIndex(2)
 
@@ -885,7 +936,7 @@ struct FloatingTabBar: View {
             expandedLiquidLens(
                 edges: edges,
                 baseWidth: baseWidth,
-                appearance: model.activeAppearance
+                appearance: .branded
             )
             .zIndex(1)
         }
@@ -905,11 +956,27 @@ struct FloatingTabBar: View {
         return shape
             .fill(.clear)
             .frame(width: size.width, height: size.height)
+            .modifier(BrandedTabBarCapsuleGlassStyle(cornerRadius: cornerRadius))
             .overlay {
-                shape.stroke(.white.opacity(0.22), lineWidth: 0.7)
+                shape.stroke(
+                    LinearGradient(
+                        colors: [
+                            BrandedTabBarStyle.Capsule.highlight,
+                            BrandedTabBarStyle.Capsule.outline,
+                            BrandedTabBarStyle.Capsule.lowerEdge
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: BrandedTabBarStyle.Capsule.outlineWidth
+                )
             }
-            .glassPanel(cornerRadius: cornerRadius)
-            .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
+            .shadow(
+                color: BrandedTabBarStyle.Capsule.shadow.color,
+                radius: BrandedTabBarStyle.Capsule.shadow.radius,
+                x: BrandedTabBarStyle.Capsule.shadow.x,
+                y: BrandedTabBarStyle.Capsule.shadow.y
+            )
             .frame(height: barHeight)
             .allowsHitTesting(false)
     }
@@ -1414,10 +1481,27 @@ struct AppTabIconView: View {
 
     @ViewBuilder
     var body: some View {
+        if tab == .calendar {
+            centerActionIcon
+        } else {
+            VStack(spacing: BrandedTabBarStyle.Item.labelSpacing) {
+                tabIcon
+
+                Text(tab.title)
+                    .font(BrandedTabBarStyle.Item.labelFont)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .allowsTightening(true)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var tabIcon: some View {
         switch tab.icon {
         case .system(let name):
             Image(systemName: name)
-                .font(.system(size: tab == .calendar ? 27 : 25, weight: .medium))
+                .font(.system(size: 25, weight: .medium))
                 .symbolVariant(.none)
         case .asset(let name):
             Image(name)
@@ -1426,5 +1510,31 @@ struct AppTabIconView: View {
                 .scaledToFit()
                 .frame(width: 29, height: 29)
         }
+    }
+
+    private var centerActionIcon: some View {
+        let shadow = BrandedTabBarStyle.CenterAction.shadow
+
+        return ZStack {
+            Circle()
+                .fill(BrandedTabBarStyle.CenterAction.fill)
+                .overlay {
+                    Circle().stroke(
+                        BrandedTabBarStyle.CenterAction.ring,
+                        lineWidth: BrandedTabBarStyle.CenterAction.ringWidth
+                    )
+                }
+                .shadow(
+                    color: shadow.color,
+                    radius: shadow.radius,
+                    x: shadow.x,
+                    y: shadow.y
+                )
+
+            Image(systemName: "plus")
+                .font(.system(size: 27, weight: .semibold))
+                .foregroundStyle(BrandedTabBarStyle.CenterAction.icon)
+        }
+        .frame(width: 48, height: 48)
     }
 }
