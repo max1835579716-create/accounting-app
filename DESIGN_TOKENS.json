@@ -1,0 +1,88 @@
+{
+  "meta": {
+    "name": "ChengLe Furry Bookkeeping Light Theme",
+    "version": "1.0",
+    "note": "Values are implementation targets. Adjust slightly for accessibility and existing project conventions."
+  },
+  "colors": {
+    "background": "#FBF7F2",
+    "backgroundWarm": "#FFF8EF",
+    "surface": "#FFFFFF",
+    "surfaceSoft": "#FFFDF9",
+    "surfacePeach": "#FFF1E4",
+    "surfaceBlue": "#EDF6FF",
+    "surfaceRose": "#FFF0F3",
+    "textPrimary": "#3B2418",
+    "textSecondary": "#8C8078",
+    "textTertiary": "#B5AAA3",
+    "accentOrange": "#F7933C",
+    "accentOrangeDeep": "#D96B22",
+    "accentAmber": "#F4B548",
+    "accentBrown": "#5A3424",
+    "accentBlue": "#58A7E6",
+    "accentTeal": "#39AFC1",
+    "accentCoral": "#E95472",
+    "positive": "#36B968",
+    "negative": "#E64848",
+    "divider": "#EEE5DD",
+    "outline": "#F0D7C4",
+    "tabInactive": "#66615D",
+    "scrim": "#3B241814"
+  },
+  "gradient": {
+    "primary": ["#FFB663", "#F4832E"],
+    "warmSurface": ["#FFFDF9", "#FFF5E9"],
+    "blue": ["#75BFF0", "#469CE1"],
+    "rose": ["#F38AA0", "#E95472"]
+  },
+  "spacing": {
+    "xxs": 4,
+    "xs": 8,
+    "sm": 12,
+    "md": 16,
+    "lg": 20,
+    "xl": 24,
+    "xxl": 32,
+    "screenHorizontal": 20,
+    "sectionVertical": 24
+  },
+  "radius": {
+    "small": 12,
+    "medium": 18,
+    "large": 24,
+    "card": 28,
+    "pill": 999
+  },
+  "shadow": {
+    "card": {
+      "color": "#6E452414",
+      "x": 0,
+      "y": 8,
+      "blur": 24
+    },
+    "floating": {
+      "color": "#7A4A2224",
+      "x": 0,
+      "y": 12,
+      "blur": 32
+    }
+  },
+  "typography": {
+    "largeTitle": {"size": 36, "weight": "bold"},
+    "title1": {"size": 28, "weight": "bold"},
+    "title2": {"size": 22, "weight": "semibold"},
+    "headline": {"size": 18, "weight": "semibold"},
+    "body": {"size": 16, "weight": "regular"},
+    "subheadline": {"size": 14, "weight": "regular"},
+    "caption": {"size": 12, "weight": "regular"},
+    "amountLarge": {"size": 28, "weight": "bold"},
+    "amountMedium": {"size": 22, "weight": "semibold"}
+  },
+  "layout": {
+    "minimumTapTarget": 44,
+    "tabBarHeightApprox": 82,
+    "mascotHeaderMaxHeight": 104,
+    "mascotCardCornerMaxHeight": 72,
+    "contentMaxDecorationOpacity": 0.16
+  }
+}
