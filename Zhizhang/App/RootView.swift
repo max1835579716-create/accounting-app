@@ -12,7 +12,7 @@ struct RootView: View {
     var body: some View {
         CustomTabShell(store: store)
         .environment(store)
-        .tint(Color(red: 0.88, green: 0.20, blue: 0.32))
+        .tint(AppTheme.Colors.accentOrange)
         .preferredColorScheme(.light)
     }
 }
@@ -32,7 +32,7 @@ private struct CustomTabShell: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            Color(.systemGroupedBackground).ignoresSafeArea()
+            AppTheme.Gradients.warmSurface.ignoresSafeArea()
 
             TabContent(
                 tab: store.selectedTab,
